@@ -1,0 +1,22 @@
+/usr/libexec/mysqld, Version: 5.5.40-log (MySQL Community Server (GPL) by Remi). started with:
+Tcp port: 3306  Unix socket: /var/lib/mysql/mysql.sock
+Time                 Id Command    Argument
+# Time: 150309 18:08:56
+# User@Host: view[view] @  [192.168.1.57]
+# Query_time: 14.397787  Lock_time: 0.000135 Rows_sent: 6205  Rows_examined: 258861
+use admin_db;
+SET timestamp=1425895736;
+SELECT * from admin_db.t_agent_install_income where Fagent = 11174 and LEFT(Fcreate_time,7) = '2014-12';
+# Time: 150309 21:39:22
+# User@Host: fql_slave[fql_slave] @  [192.168.1.50]
+# Query_time: 3.741427  Lock_time: 0.000365 Rows_sent: 1  Rows_examined: 209862
+SET timestamp=1425908362;
+SELECT COALESCE(Ftotal_order_num,0) AS Ftotal_order_num,COALESCE(Fwait_valid_order_num,0) AS Fwait_valid_order_num,COALESCE(Fclose_order_num,0) AS Fclose_order_num,COALESCE(Fvalid_order_num,0) AS Fvalid_order_num,COALESCE(Forder_ex_num,0) AS Forder_ex_num,COALESCE(Forder_ex_finished_num,0) AS Forder_ex_finished_num,COALESCE(Fbuy_suc_order_num,0) AS Fbuy_suc_order_num,COALESCE(Frecv_good_num,0) AS Frecv_good_num,COALESCE(Ffirstpay_num,0) AS Ffirstpay_num,COALESCE(Ffinish_order_num,0) AS Ffinish_order_num,COALESCE(Fupload_contract_num,0) AS Fupload_contract_num,COALESCE(Ftotal_amount,0) AS Ftotal_amount,COALESCE(Fuser_num,0) AS Fuser_num FROM (select COUNT(1) AS Ftotal_order_num,
+					COUNT(IF(Forder_state < 20 OR Forder_state = 100,true,null)) as Fwait_valid_order_num,
+					COUNT(IF(Forder_state=20 or Forder_state=120 or Forder_state=220 or Forder_state=301 or Forder_state=340,true,null)) as Fclose_order_num,
+					COUNT(IF(Fcheck_result&2048<>0 OR Fcheck_result&4096<>0,true,null)) as Forder_ex_num,
+					COUNT(IF(Fcheck_result&8192<>0,true,null)) as Forder_ex_finished_num,
+					COUNT(IF((Forder_state=110 OR Forder_state>=200) AND Forder_state!=220 AND Forder_state!=301 AND Forder_state!=340 AND Fcheck_result&2048=0 AND Fcheck_result&4096=0 AND Fcheck_result&8192=0,true,null)) as Fvalid_order_num,COUNT(IF(Forder_state=110 or Forder_state=200 or Forder_state=210,true,null)) as Fbuy_suc_order_num,
+					COUNT(IF((Forder_state=300 or Forder_state=310 or Forder_state=320) AND Fcheck_result&2048=0 AND Fcheck_result&4096=0 AND Fcheck_result&8192=0,true,null)) as Frecv_good_num,
+					COUNT(IF(Forder_state>=350 and Fpay_state!=21 and Ftotal_firstpay!=0,true,null)) as Ffirstpay_num,
+					COUNT(IF(Forder_state>=350 and (Fpay_state=21 or Ftotal_firstpay=0),true,null)) as Ffinish_order_num,COUNT(IF(Forder_state>=350 AND (Fcontract_front="" || Fcontract_sign=""),true,null)) as Fupload_contract_num,SUM(IF(Forder_state>=350,Ftotal_amount,0)) AS Ftotal_amount from order_db.t_order where Finner_flag&1=0 AND Fcreate_time>='2015-03-01 00:00:00' AND Fcreate_time<='2015-03-31 23:59:59' AND Fdistrict_id_stat = 17 and Forder_type in (0,10)) as OO  INNER JOIN (select count(1) as Fuser_num from user_db.t_user_info ui left join admin_db.t_area_info ai using(Farea_id) WHERE ui.Fcreate_time>='2015-03-01 00:00:00' AND ui.Fcreate_time<='2015-03-31 23:59:59' AND ai.Fdistrict_id = 17) as U  WHERE  1;
