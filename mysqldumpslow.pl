@@ -52,38 +52,6 @@ GetOptions(\%opt,
 
 $opt{'help'} and usage();
 
-unless (@ARGV) {
-    my $defaults   = `my_print_defaults mysqld`;
-    my $basedir = ($defaults =~ m/--basedir=(.*)/)[0]
-	or die "Can't determine basedir from 'my_print_defaults mysqld' output: $defaults";
-    warn "basedir=$basedir\n" if $opt{v};
-
-    my $datadir = ($defaults =~ m/--datadir=(.*)/)[0];
-    my $slowlog = ($defaults =~ m/--log-slow-queries=(.*)/)[0];
-    if (!$datadir or $opt{i}) {
-	# determine the datadir from the instances section of /etc/my.cnf, if any
-	my $instances  = `my_print_defaults instances`;
-	die "Can't determine datadir from 'my_print_defaults mysqld' output: $defaults"
-	    unless $instances;
-	my @instances = ($instances =~ m/^--(\w+)-/mg);
-	die "No -i 'instance_name' specified to select among known instances: @instances.\n"
-	    unless $opt{i};
-	die "Instance '$opt{i}' is unknown (known instances: @instances)\n"
-	    unless grep { $_ eq $opt{i} } @instances;
-	$datadir = ($instances =~ m/--$opt{i}-datadir=(.*)/)[0]
-	    or die "Can't determine --$opt{i}-datadir from 'my_print_defaults instances' output: $instances";
-	warn "datadir=$datadir\n" if $opt{v};
-    }
-
-    if ( -f $slowlog ) {
-        @ARGV = ($slowlog);
-        die "Can't find '$slowlog'\n" unless @ARGV;
-    } else {
-        @ARGV = <$datadir/$opt{h}-slow.log>;
-        die "Can't find '$datadir/$opt{h}-slow.log'\n" unless @ARGV;
-    }
-}
-
 warn "\nReading mysql slow query log from @ARGV\n";
 
 my @pending;
@@ -101,9 +69,9 @@ while ( defined($_ = shift @pending) or defined($_ = <>) ) {
 
     s/^#? Time: \d{6}\s+\d+:\d+:\d+.*\n//;
     my ($user,$host) = s/^#? User\@Host:\s+(\S+)\s+\@\s+(\S+).*\n// ? ($1,$2) : ('','');
-
-    s/^# Query_time: ([0-9.]+)\s+Lock_time: ([0-9.]+)\s+Rows_sent: ([0-9.]+).*\n//;
-    my ($t, $l, $r) = ($1, $2, $3);
+###$re
+    s/^# Query_time: ([0-9.]+)\s+Lock_time: ([0-9.]+)\s+Rows_sent: ([0-9.]+)\s+Rows_examined: ([0-9.]+).*\n//;
+    my ($t, $l, $r,$re) = ($1, $2, $3,$4);
     $t -= $l unless $opt{l};
 
     # remove fluff that mysqld writes to log when it (re)starts:
@@ -140,6 +108,8 @@ while ( defined($_ = shift @pending) or defined($_ = <>) ) {
     $s->{t} += $t;
     $s->{l} += $l;
     $s->{r} += $r;
+###$re
+    $s->{re} += $re;
     $s->{users}->{$user}++ if $user;
     $s->{hosts}->{$host}++ if $host;
 
@@ -148,10 +118,11 @@ while ( defined($_ = shift @pending) or defined($_ = <>) ) {
 
 foreach (keys %stmt) {
     my $v = $stmt{$_} || die;
-    my ($c, $t, $l, $r) = @{ $v }{qw(c t l r)};
+    my ($c, $t, $l, $r ,$re) = @{ $v }{qw(c t l r re)};
     $v->{at} = $t / $c;
     $v->{al} = $l / $c;
     $v->{ar} = $r / $c;
+    $v->{are} = $re/ $c;
 }
 
 my @sorted = sort { $stmt{$b}->{$opt{s}} <=> $stmt{$a}->{$opt{s}} } keys %stmt;
@@ -160,13 +131,13 @@ my @sorted = sort { $stmt{$b}->{$opt{s}} <=> $stmt{$a}->{$opt{s}} } keys %stmt;
 
 foreach (@sorted) {
     my $v = $stmt{$_} || die;
-    my ($c, $t,$at, $l,$al, $r,$ar) = @{ $v }{qw(c t at l al r ar)};
+    my ($c, $t,$at, $l,$al, $r,$ar,$re,$are) = @{ $v }{qw(c t at l al r ar re are)};
     my @users = keys %{$v->{users}};
     my $user  = (@users==1) ? $users[0] : sprintf "%dusers",scalar @users;
     my @hosts = keys %{$v->{hosts}};
     my $host  = (@hosts==1) ? $hosts[0] : sprintf "%dhosts",scalar @hosts;
-    printf "Count: %d  Time=%.2fs (%ds)  Lock=%.2fs (%ds)  Rows=%.1f (%d), $user\@$host\n%s\n\n",
-	    $c, $at,$t, $al,$l, $ar,$r, $_;
+    printf "Count: %d  Time=%.2fs (%ds)  Lock=%.2fs (%ds)  Rows=%.1f (%d)  Rows_examined=%.1f (%d), $user\@$host\n%s\n\n",
+	    $c, $at,$t, $al,$l, $ar,$r,$are,$re, $_;
 }
 
 sub usage {
